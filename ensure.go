@@ -29,9 +29,9 @@ func RequireValidWasmDir() string {
 	var dir string
 	var version string
 
-	isToolchian := IsToolChain()
+	isToolchain := IsToolChain()
 
-	if isToolchian {
+	if isToolchain {
 		version = ReadVersion()
 		cacheDir := Must2(os.UserCacheDir())
 
@@ -40,8 +40,8 @@ func RequireValidWasmDir() string {
 	} else {
 		dir = filepath.Join(runtime.GOROOT(), "misc", "wasm")
 	}
-	Must(RequireFile(dir, "wasm_exec.js", version, isToolchian))
-	Must(RequireFile(dir, "wasm_exec_node.js", version, isToolchian))
+	Must(RequireFile(dir, "wasm_exec.js", version, isToolchain))
+	Must(RequireFile(dir, "wasm_exec_node.js", version, isToolchain))
 
 	return dir
 }
