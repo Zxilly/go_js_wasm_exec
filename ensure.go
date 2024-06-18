@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -26,23 +28,28 @@ func Must2[T any](v T, err error) T {
 func RequireValidWasmDir() string {
 	var dir string
 	var version string
-	if IsToolChain() {
+
+	isToolchian := IsToolChain()
+
+	if isToolchian {
 		version = ReadVersion()
 		cacheDir := Must2(os.UserCacheDir())
 
 		dir = filepath.Join(cacheDir, "wasm-exec", version)
 		Must(os.MkdirAll(dir, 0755))
 	} else {
-		dir = runtime.GOROOT()
+		dir = filepath.Join(runtime.GOROOT(), "misc", "wasm")
 	}
-	Must(RequireFile(dir, "misc/wasm/wasm_exec.js", version))
-	Must(RequireFile(dir, "misc/wasm/wasm_exec_node.js", version))
+	Must(RequireFile(dir, "wasm_exec.js", version, isToolchian))
+	Must(RequireFile(dir, "wasm_exec_node.js", version, isToolchian))
 
-	return filepath.Join(dir, "misc/wasm")
+	return dir
 }
 
 func IsToolChain() bool {
-	return strings.Contains(runtime.GOROOT(), "golang.org"+string(os.PathSeparator)+"toolchain")
+	goroot := runtime.GOROOT()
+	return strings.Contains(goroot, "golang.org/toolchain") ||
+		(strings.Contains(goroot, "golang.org\\toolchain"))
 }
 
 func ReadVersion() string {
@@ -51,7 +58,7 @@ func ReadVersion() string {
 	return lines[0]
 }
 
-func RequireFile(dir string, filename string, version string) error {
+func RequireFile(dir string, filename string, version string, tryDownload bool) error {
 	absFileName := filepath.Join(dir, filename)
 
 	baseDir := filepath.Dir(absFileName)
@@ -72,16 +79,23 @@ func RequireFile(dir string, filename string, version string) error {
 		return err
 	}
 
-	url := fmt.Sprintf("https://raw.githubusercontent.com/golang/go/%s/%s", version, filename)
+	if !tryDownload {
+		panic(errors.New("file not found: " + absFileName))
+	}
 
-	f := Must2(os.Create(absFileName))
-	defer func() {
-		Must(f.Close())
-	}()
+	url := fmt.Sprintf("https://raw.githubusercontent.com/golang/go/%s/misc/wasm/%s", version, filename)
 
 	resp := Must2(http.Get(url))
 
-	_ = Must2(io.Copy(f, resp.Body))
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("get %s failed: %s", url, resp.Status)
+	}
+
+	b := new(bytes.Buffer)
+
+	_ = Must2(io.Copy(b, resp.Body))
+
+	Must(os.WriteFile(absFileName, b.Bytes(), 0644))
 
 	return nil
 }
