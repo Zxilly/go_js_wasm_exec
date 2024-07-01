@@ -4,11 +4,14 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
 func main() {
-	args := []string{"--stack-size=8192", "wasm_exec_node.js"}
+	dir := RequireValidWasmDir()
+	jsFile := filepath.Join(dir, "wasm_exec_node.js")
+	args := []string{"--stack-size=8192", jsFile}
 	args = append(args, os.Args[1:]...)
 
 	node, err := exec.LookPath("node")
@@ -17,7 +20,12 @@ func main() {
 	}
 
 	cmd := exec.Command(node, args...)
-	cmd.Dir = RequireValidWasmDir()
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		panic(fmt.Errorf("failed to get current working directory: %w", err))
+	}
+	cmd.Dir = cwd
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
