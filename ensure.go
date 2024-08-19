@@ -1,9 +1,9 @@
 package main
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
+	"go/version"
 	"io"
 	"net/http"
 	"os"
@@ -27,21 +27,25 @@ func Must2[T any](v T, err error) T {
 
 func RequireValidWasmDir() string {
 	var dir string
-	var version string
+	var ver string
 
 	isToolchain := IsToolChain()
 
 	if isToolchain {
-		version = ReadVersion()
+		ver = ReadVersion()
 		cacheDir := Must2(os.UserCacheDir())
 
-		dir = filepath.Join(cacheDir, "wasm-exec", version)
+		dir = filepath.Join(cacheDir, "wasm-exec", ver)
 		Must(os.MkdirAll(dir, 0755))
 	} else {
-		dir = filepath.Join(runtime.GOROOT(), "misc", "wasm")
+		if version.Compare(runtime.Version(), "go1.24") < 0 {
+			dir = filepath.Join(runtime.GOROOT(), "misc", "wasm")
+		} else {
+			dir = filepath.Join(runtime.GOROOT(), "lib", "wasm")
+		}
 	}
-	Must(RequireFile(dir, "wasm_exec.js", version, isToolchain))
-	Must(RequireFile(dir, "wasm_exec_node.js", version, isToolchain))
+	Must(RequireFile(dir, "wasm_exec.js", ver, isToolchain))
+	Must(RequireFile(dir, "wasm_exec_node.js", ver, isToolchain))
 
 	return dir
 }
@@ -83,19 +87,28 @@ func RequireFile(dir string, filename string, version string, tryDownload bool) 
 		panic(errors.New("file not found: " + absFileName))
 	}
 
-	url := fmt.Sprintf("https://raw.githubusercontent.com/golang/go/%s/misc/wasm/%s", version, filename)
+	const base = "https://raw.githubusercontent.com/golang/go"
+
+	url := fmt.Sprintf(base+"/%s/misc/wasm/%s", version, filename)
 
 	resp := Must2(http.Get(url))
+	defer func(Body io.ReadCloser) {
+		Must(Body.Close())
+	}(resp.Body)
+
+	if resp.StatusCode == http.StatusNotFound {
+		url = fmt.Sprintf(base+"/%s/lib/wasm/%s", version, filename)
+		resp = Must2(http.Get(url))
+		defer func(Body io.ReadCloser) {
+			Must(Body.Close())
+		}(resp.Body)
+	}
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("get %s failed: %s", url, resp.Status)
 	}
 
-	b := new(bytes.Buffer)
-
-	_ = Must2(io.Copy(b, resp.Body))
-
-	Must(os.WriteFile(absFileName, b.Bytes(), 0644))
+	Must(os.WriteFile(absFileName, Must2(io.ReadAll(resp.Body)), 0644))
 
 	return nil
 }

@@ -30,7 +30,7 @@ func main() {
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
 
-	//calculate env size
+	// calculate env size
 	envSize := 0
 	for _, e := range os.Environ() {
 		envSize += len(e) + 1
