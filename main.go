@@ -48,6 +48,7 @@ func main() {
 
 	// filter env
 	if err := cmd.Run(); err != nil {
+		fmt.Println(node, args)
 		panic(err)
 	}
 }

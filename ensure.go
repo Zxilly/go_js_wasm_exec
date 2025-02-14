@@ -29,7 +29,7 @@ func RequireValidWasmDir() string {
 	var dir string
 	var ver string
 
-	shouldDownload := IsToolChain() || version.Compare(runtime.Version(), "go1.24") >= 0
+	shouldDownload := IsToolChain() && version.Compare(runtime.Version(), "go1.24") < 0
 
 	if shouldDownload {
 		ver = ReadVersion()
