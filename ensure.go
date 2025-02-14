@@ -29,9 +29,9 @@ func RequireValidWasmDir() string {
 	var dir string
 	var ver string
 
-	isToolchain := IsToolChain()
+	shouldDownload := IsToolChain() || version.Compare(runtime.Version(), "go1.24") >= 0
 
-	if isToolchain {
+	if shouldDownload {
 		ver = ReadVersion()
 		cacheDir := Must2(os.UserCacheDir())
 
@@ -44,8 +44,8 @@ func RequireValidWasmDir() string {
 			dir = filepath.Join(runtime.GOROOT(), "lib", "wasm")
 		}
 	}
-	Must(RequireFile(dir, "wasm_exec.js", ver, isToolchain))
-	Must(RequireFile(dir, "wasm_exec_node.js", ver, isToolchain))
+	Must(RequireFile(dir, "wasm_exec.js", ver, shouldDownload))
+	Must(RequireFile(dir, "wasm_exec_node.js", ver, shouldDownload))
 
 	return dir
 }
