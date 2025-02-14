@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -30,6 +31,9 @@ func RequireValidWasmDir() string {
 	var ver string
 
 	shouldDownload := IsToolChain() && version.Compare(runtime.Version(), "go1.24") < 0
+	if shouldDownload {
+		_, _ = fmt.Fprintln(os.Stderr, "Should download wasm_exec.js and wasm_exec_node.js")
+	}
 
 	if shouldDownload {
 		ver = ReadVersion()
@@ -39,9 +43,9 @@ func RequireValidWasmDir() string {
 		Must(os.MkdirAll(dir, 0755))
 	} else {
 		if version.Compare(runtime.Version(), "go1.24") < 0 {
-			dir = filepath.Join(runtime.GOROOT(), "misc", "wasm")
+			dir = filepath.Join(GetGoRoot(), "misc", "wasm")
 		} else {
-			dir = filepath.Join(runtime.GOROOT(), "lib", "wasm")
+			dir = filepath.Join(GetGoRoot(), "lib", "wasm")
 		}
 	}
 	Must(RequireFile(dir, "wasm_exec.js", ver, shouldDownload))
@@ -50,14 +54,24 @@ func RequireValidWasmDir() string {
 	return dir
 }
 
+func GetGoRoot() string {
+	cmd := exec.Command("go", "env", "GOROOT")
+	cmd.Stderr = os.Stderr
+	out, err := cmd.Output()
+	if err != nil {
+		panic(err)
+	}
+	return strings.TrimSpace(string(out))
+}
+
 func IsToolChain() bool {
-	goroot := runtime.GOROOT()
+	goroot := GetGoRoot()
 	return strings.Contains(goroot, "golang.org/toolchain") ||
 		(strings.Contains(goroot, "golang.org\\toolchain"))
 }
 
 func ReadVersion() string {
-	versionFile := Must2(os.ReadFile(filepath.Join(runtime.GOROOT(), "VERSION")))
+	versionFile := Must2(os.ReadFile(filepath.Join(GetGoRoot(), "VERSION")))
 	lines := strings.Split(string(versionFile), "\n")
 	return lines[0]
 }
